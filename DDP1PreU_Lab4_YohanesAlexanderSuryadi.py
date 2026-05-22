@@ -1,0 +1,226 @@
+from tkinter import *
+from tkinter import messagebox
+from tkinter import filedialog
+import random
+
+class Task:
+    def __init__(self, title):
+        self.title = title
+        self.status = False
+
+    def toggle_status(self):
+        self.status = not self.status
+
+    def __str__(self):
+        if self.status == True:
+            return f"[✓] {self.title}"
+        return f"[ ] {self.title}"
+
+class TaskManager:
+    def __init__(self):
+        self.task_list = []
+
+    def add_task(self, title):
+        self.task_list.append(Task(title))
+
+    def import_task(self, file):
+        with open(file, "r", encoding="utf-8") as f:
+            for baris in f:
+                title = baris.strip()
+                if title:
+                    self.add_task(title)
+
+    def export_task(self, file):
+        with open(file, "w", encoding="utf-8") as f:
+            for task in self.task_list:
+                if not task.status:  
+                    f.write(task.title + "\n")
+
+    def delete_task(self, index):
+        del self.task_list[index]
+
+    def delete_all_task(self):
+        del self.task_list[:]
+
+    def toggle_task(self, index):
+        self.task_list[index].toggle_status()
+
+    def get_stats(self):
+        total = len(self.task_list)
+        selesai = sum(task.status for task in self.task_list)
+        return total, selesai
+
+class ToDoMateApp:
+    # GUI Config
+    def __init__(self, master):
+        self.master = master
+        self.manager = TaskManager()
+
+        # Window Config
+        master.title("ToDoMate")
+        master.geometry("500x500+100+50")
+        master.configure(bg="#e8f4f8")
+
+        self.master.protocol("WM_DELETE_WINDOW", self.on_exit)
+
+        # Heading section
+        self.headingframe = Frame(bg="#fff3e0")
+        self.headingframe.pack(fill=X)
+
+        # Label Tugas Baru
+        self.label1 = Label(self.headingframe, text="Tugas Baru:", bg="#fff3e0")
+        self.label1.grid(row=0, column=0, sticky=W)
+
+        # Task Entry
+        self.taskentry = Entry(self.headingframe)
+        self.taskentry.grid(row=1, column=0, sticky=EW, padx=5, pady=5)
+
+        # Button Tambah
+        self.addbutton = Button(self.headingframe, text="Tambah", bg="#2A941C", fg="#ffffff", command=self.add_task)
+        self.addbutton.grid(row=1, column=1, padx=20)
+
+        self.headingframe.columnconfigure(0, weight=1)
+
+        # Listbox section
+        self.tasklistframe = Frame(master)
+        self.tasklistframe.pack(fill=BOTH, expand=True)
+
+        # Label Daftar Tugas
+        self.tasklistlabel = Label(self.tasklistframe, text="Daftar Tugas:")
+        self.tasklistlabel.pack(anchor=NW)
+
+        # Scrollbar
+        self.scrollbar = Scrollbar(self.tasklistframe)
+        self.scrollbar.pack(side=RIGHT, fill=Y)
+
+        # Listbox
+        self.listbox = Listbox(self.tasklistframe, yscrollcommand=self.scrollbar.set, height=10)
+        self.listbox.pack(fill=BOTH, expand=True)
+
+        self.scrollbar.config(command=self.listbox.yview)
+
+        # Buttons section (atas)
+        self.buttonsframe = Frame(master, bg="#e8f4f8")
+        self.buttonsframe.pack(pady=10)
+
+        # Button Ubah Status
+        self.statusbutton = Button(self.buttonsframe, text="Ubah Status", bg="#1e90ff", fg="white", width=13, command=self.toggle_task)
+        self.statusbutton.pack(side=LEFT, padx=10)
+
+        # Button Hapus
+        self.deletebutton = Button(self.buttonsframe, text="Hapus", bg="#ff3b30", fg="white", width=13, command=self.delete_task)
+        self.deletebutton.pack(side=LEFT, padx=10)
+
+        # Button Hapus Semua
+        self.deleteallbutton = Button(self.buttonsframe, text="Hapus Semua", bg="#ff3b30", fg="white", width=13, command=self.delete_all_task)
+        self.deleteallbutton.pack(side=LEFT, padx=10)
+
+        # Buttons Section (bawah)
+        self.importexportframe = Frame(master, bg="#e8f4f8")
+        self.importexportframe.pack(pady=5)
+
+        # Button Import
+        self.importbutton = Button(self.importexportframe, text="Import tugas", bg="#6a5acd", fg="white", width=13, command=self.import_task)
+        self.importbutton.pack(side=LEFT, padx=10)
+
+        # Button Export
+        self.exportbutton = Button(self.importexportframe, text="Export tugas", bg="#e69122", fg="white", width=13, command=self.export_task)
+        self.exportbutton.pack(side=LEFT, padx=10)
+
+        # Label Status
+        self.statuslabel = Label(master, text="Total: 0 | Selesai: 0", bg="#e8f4f8")
+        self.statuslabel.pack(pady=5)
+
+    # Tambah tugas baru
+    def add_task(self):
+        title = self.taskentry.get().strip()
+
+        if not title:
+            messagebox.showwarning("Peringatan", "Tugas tidak boleh kosong!")
+            return
+
+        self.manager.add_task(title)
+        self.taskentry.delete(0, END)
+        self.refresh_display()
+
+    # Import tugas
+    def import_task(self):
+        file = filedialog.askopenfilename(title="Import Tugas", filetypes=[("Text File", "*.txt")])
+
+        if not file:
+            return
+
+        try:
+            self.manager.import_task(file)
+            self.refresh_display()
+            messagebox.showinfo("Berhasil", "Tugas berhasil diimpor!")
+        except Exception as e:
+            messagebox.showerror("Error", f"Gagal mengimpor file:\n{e}")
+
+    # Export Tugas                
+    def export_task(self):
+        if not self.manager.task_list:
+            messagebox.showinfo("Info", "Tidak ada tugas untuk diekspor!")
+            return
+
+        file = filedialog.asksaveasfilename(title="Export Tugas", defaultextension=".txt", filetypes=[("Text File", "*.txt")])
+
+        if not file:
+            return
+
+        try:
+            self.manager.export_task(file)
+            messagebox.showinfo("Berhasil", "Tugas yang belum selesai berhasil diekspor!")
+        except Exception as e:
+            messagebox.showerror("Error", f"Gagal mengekspor file:\n{e}")
+
+    # Hapus Tugas
+    def delete_task(self):
+        try:
+            index = self.listbox.curselection()[0]
+            self.manager.delete_task(index)
+            self.refresh_display()
+        except IndexError:
+            messagebox.showwarning("Peringatan", "Pilih tugas terlebih dahulu!")
+
+    def delete_all_task(self):
+        konfirmasi = messagebox.askyesno("Peringatan", "Anda yakin ingin menghapus semua tugas anda?")
+        
+        if konfirmasi:
+            self.manager.delete_all_task()
+        self.refresh_display()
+
+    # Ubah Status Tugas
+    def toggle_task(self):
+        try:
+            index = self.listbox.curselection()[0]
+            self.manager.toggle_task(index)
+            self.refresh_display()
+        except IndexError:
+            messagebox.showwarning("Peringatan", "Pilih tugas terlebih dahulu!")
+
+    # Konfirmasi saat exit
+    def on_exit(self):
+        randomiz = random.randint(1, 3)
+        if randomiz == 1:
+            konfirmasi = messagebox.askyesno("Keluar", "Apakah anda yakin ingin keluar dari ToDoMate?")
+        elif randomiz == 2:
+            konfirmasi = messagebox.askyesno("Keluar", "Apakah semua tugas anda sudah selesai?")
+        elif randomiz == 3:
+            konfirmasi = messagebox.askyesno("Keluar", "Sudahkah anda menyelesaikan semua tugas anda?")
+        if konfirmasi:
+            self.master.destroy()
+
+    # Refresh Window untuk Sinkronisasi Status
+    def refresh_display(self):
+        self.listbox.delete(0, END)
+        for task in self.manager.task_list:
+            self.listbox.insert(END, str(task))
+
+        total, selesai = self.manager.get_stats()
+        self.statuslabel.config(text=f"Total: {total} | Selesai: {selesai}")
+
+# Main App
+root = Tk()
+app = ToDoMateApp(root)
+root.mainloop()
